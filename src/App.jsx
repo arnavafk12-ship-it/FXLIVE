@@ -37,7 +37,7 @@ const CURRENCY_NAMES = {
   THB: 'Thai Baht', MYR: 'Malaysian Ringgit', IDR: 'Indonesian Rupiah', PHP: 'Philippine Peso', VND: 'Vietnamese Dong',
   BDT: 'Bangladeshi Taka', PKR: 'Pakistani Rupee', LKR: 'Sri Lankan Rupee', NPR: 'Nepalese Rupee', MMK: 'Myanmar Kyat',
   KHR: 'Cambodian Riel', MNT: 'Mongolian Tugrik',
-  NOK: 'Norwegian Krone', SEK: 'Swedish Krona', DKK: 'Danish Krone', PLN: 'Polish Zloty', CZK: 'Czech Koruna',
+  NOK: 'Norwegian Krone', SEK: 'Swedish Krona', DKK: 'Danish Krone', PLN: 'Polish Zloty', CZK: 'Czech Coruna',
   HUF: 'Hungarian Forint', RON: 'Romanian Leu', BGN: 'Bulgarian Lev', HRK: 'Croatian Kuna', RSD: 'Serbian Dinar',
   ISK: 'Icelandic Krona', UAH: 'Ukrainian Hryvnia', GEL: 'Georgian Lari', AMD: 'Armenian Dram', AZN: 'Azerbaijani Manat',
   BYN: 'Belarusian Ruble', MDL: 'Moldovan Leu', MKD: 'Macedonian Denar', BAM: 'Bosnian Mark', ALL: 'Albanian Lek',
@@ -167,7 +167,7 @@ function Ticker({ rates, prevRates, base }) {
   )
 }
 
-function RateCard({ cur, rate, prevRate, base, selected, onClick, index }) {
+function RateCard({ cur, rate, prevRate, base, selected, isPinned, onPinToggle, onClick, index }) {
   const dir = prevRate ? (rate > prevRate ? 1 : rate < prevRate ? -1 : 0) : 0
   const pct = prevRate ? ((rate - prevRate) / prevRate * 100) : 0
 
@@ -190,7 +190,22 @@ function RateCard({ cur, rate, prevRate, base, selected, onClick, index }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: 20 }}>{FLAG[cur] || '🏳️'}</span>
           <div>
-            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 14, letterSpacing: '0.04em', color: dir === 1 ? 'var(--green)' : dir === -1 ? 'var(--red)' : 'var(--text)' }}>{cur}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 14, letterSpacing: '0.04em', color: dir === 1 ? 'var(--green)' : dir === -1 ? 'var(--red)' : 'var(--text)' }}>{cur}</div>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onPinToggle(cur);
+                }}
+                style={{
+                  background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 14, padding: '0 2px',
+                  color: isPinned ? 'var(--accent)' : 'var(--text-3)', transition: 'color 0.15s, transform 0.1s'
+                }}
+                title={isPinned ? 'Unpin Currency' : 'Pin Currency'}
+              >
+                {isPinned ? '★' : '☆'}
+              </button>
+            </div>
             <div style={{ fontSize: 9, color: 'var(--text-3)', marginTop: 2 }}>{CURRENCY_NAMES[cur] || ''}</div>
           </div>
         </div>
@@ -309,7 +324,14 @@ export default function App() {
   const [selectedCur, setSelectedCur] = useState(null)
   const [search, setSearch] = useState('')
   const [rateHistory, setRateHistory] = useState({})
-  const [theme, setTheme] = useState('dark') // Manage theme configuration state
+  const [theme, setTheme] = useState('dark')
+
+  // Pinned items state synced with localStorage persistence
+  const [pinned, setPinned] = useState(() => {
+    const saved = localStorage.getItem('fx_pinned_currencies')
+    return saved ? JSON.parse(saved) : ['EUR', 'GBP', 'INR']
+  })
+
   const { rates, prevRates, lastUpdated, loading, error, source, refresh } = useRates(base)
 
   useEffect(() => {
@@ -324,6 +346,17 @@ export default function App() {
       })
     }
   }, [rates])
+
+  // Handles adding or deleting items from the watchlist array setup
+  const handlePinToggle = (currencyCode) => {
+    setPinned(prev => {
+      const next = prev.includes(currencyCode)
+        ? prev.filter(c => c !== currencyCode)
+        : [...prev, currencyCode]
+      localStorage.setItem('fx_pinned_currencies', JSON.stringify(next))
+      return next
+    })
+  }
 
   const filtered = Object.entries(rates).filter(([cur]) =>
     cur.toLowerCase().includes(search.toLowerCase()) ||
@@ -341,7 +374,6 @@ export default function App() {
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', flexDirection: 'column', color: 'var(--text)' }}>
 
-      {/* Dynamic injection block to override properties globally for dark / light variations */}
       <style>{`
         :root {
           --accent: #ffd200;
@@ -350,7 +382,6 @@ export default function App() {
           --font-mono: 'Courier New', Courier, monospace;
           --font-display: sans-serif;
           
-          /* Dark theme definitions */
           ${theme === 'dark' ? `
             --bg: #0c0d12;
             --bg-1: #13151f;
@@ -362,7 +393,6 @@ export default function App() {
             --text-2: #a2a9ca;
             --text-3: #5f6684;
           ` : `
-            /* Clean Light theme definitions */
             --bg: #f5f6fa;
             --bg-1: #ffffff;
             --bg-2: #edf0f7;
@@ -397,7 +427,6 @@ export default function App() {
             <span style={{ fontSize: 10, color: 'var(--red)', fontFamily: 'var(--font-mono)', maxWidth: 260 }}>{error}</span>
           )}
 
-          {/* New Theme Switcher Button */}
           <button
             onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
             style={{
@@ -431,7 +460,6 @@ export default function App() {
           <div style={{ padding: '0 18px 18px' }}>
             <div style={{ fontSize: 10, color: 'var(--text-3)', letterSpacing: '0.12em', marginBottom: 10, fontFamily: 'var(--font-display)', fontWeight: 600 }}>BASE CURRENCY</div>
 
-            {/* Master Dropdown for all 80+ currencies */}
             <select
               value={base}
               onChange={(e) => { setBase(e.target.value); setSelectedCur(null); }}
@@ -477,7 +505,10 @@ export default function App() {
                     <span style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 7 }}>
                       <span style={{ fontSize: 15 }}>{FLAG[c]}</span>
                       <span style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: dir === 1 ? 'var(--green)' : dir === -1 ? 'var(--red)' : 'var(--text-2)' }}>{c}</span>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: dir === 1 ? 'var(--green)' : dir === -1 ? 'var(--red)' : 'var(--text-2)' }}>{c}</span>
+                          {pinned.includes(c) && <span style={{ color: 'var(--accent)', fontSize: 10 }}>★</span>}
+                        </span>
                         <span style={{ fontFamily: 'var(--font-display)', fontSize: 9, color: 'var(--text-3)', fontWeight: 500 }}>{CURRENCY_NAMES[c] || ''}</span>
                       </span>
                     </span>
@@ -491,8 +522,35 @@ export default function App() {
           </div>
         </aside>
 
-        {/* Main grid */}
+        {/* Main Workspace Area */}
         <main style={{ flex: 1, padding: 22, overflowY: 'auto' }}>
+
+          {/* ── PINNED RATES ROW BLOCK (ABOVE SEARCH CURRENCY BAR) ── */}
+          {!loading && pinned.filter(c => c !== base && rates[c]).length > 0 && (
+            <div style={{ marginBottom: 24, paddingBottom: 16, borderBottom: '1px solid var(--border)' }}>
+              <div style={{ fontSize: 10, color: 'var(--accent)', letterSpacing: '0.15em', fontWeight: 700, marginBottom: 12, fontFamily: 'var(--font-display)' }}>
+                📌 PINNED WATCHLIST
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: 8 }}>
+                {pinned.filter(c => c !== base && rates[c]).map((cur, i) => (
+                  <RateCard
+                    key={`pinned-${cur}`}
+                    cur={cur}
+                    rate={rates[cur]}
+                    prevRate={prevRates[cur]}
+                    base={base}
+                    selected={selectedCur === cur}
+                    isPinned={true}
+                    onPinToggle={handlePinToggle}
+                    onClick={() => setSelectedCur(cur === selectedCur ? null : cur)}
+                    index={i}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Search Box Currency Controls Row */}
           <div style={{ display: 'flex', gap: 12, marginBottom: 22, alignItems: 'center' }}>
             <input
               placeholder="SEARCH CURRENCY OR NAME..."
@@ -510,6 +568,7 @@ export default function App() {
             </span>
           </div>
 
+          {/* Market Grid Cards Block */}
           {loading ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 300, gap: 12 }}>
               <div style={{ width: 40, height: 40, border: '2px solid var(--border)', borderTop: '2px solid var(--accent)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
@@ -530,15 +589,24 @@ export default function App() {
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(190px,1fr))', gap: 8 }}>
               {filtered.map(([cur, rate], i) => (
-                <RateCard key={cur} cur={cur} rate={rate} prevRate={prevRates[cur]}
-                  base={base} selected={selectedCur === cur}
-                  onClick={() => setSelectedCur(cur === selectedCur ? null : cur)} index={i} />
+                <RateCard
+                  key={`grid-${cur}`}
+                  cur={cur}
+                  rate={rate}
+                  prevRate={prevRates[cur]}
+                  base={base}
+                  selected={selectedCur === cur}
+                  isPinned={pinned.includes(cur)}
+                  onPinToggle={handlePinToggle}
+                  onClick={() => setSelectedCur(cur === selectedCur ? null : cur)}
+                  index={i}
+                />
               ))}
             </div>
           )}
         </main>
 
-        {/* Detail panel */}
+        {/* Detail Panel */}
         {selectedCur && rates[selectedCur] && (
           <aside style={{ width: 272, borderLeft: '1px solid var(--border)', padding: 22, flexShrink: 0, overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 22 }}>
